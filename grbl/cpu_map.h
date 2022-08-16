@@ -29,6 +29,8 @@
 
 #ifdef CPU_MAP_ATMEGA328P // (Arduino Uno) Officially supported by Grbl.
 
+  #define PEN_SERVO
+
   // Define serial port pins and interrupt vectors.
   #define SERIAL_RX     USART_RX_vect
   #define SERIAL_UDRE   USART_UDRE_vect
@@ -62,11 +64,8 @@
   #define LIMIT_PORT       PORTB
   #define X_LIMIT_BIT      1  // Uno Digital Pin 9
   #define Y_LIMIT_BIT      2  // Uno Digital Pin 10
-  #ifdef VARIABLE_SPINDLE // Z Limit pin and spindle enabled swapped to access hardware PWM on Pin 11.
-    #define Z_LIMIT_BIT	   4 // Uno Digital Pin 12
-  #else
-    #define Z_LIMIT_BIT    3  // Uno Digital Pin 11
-  #endif
+  #define Z_LIMIT_BIT      4  // Uno Digital Pin 12
+
   #if !defined(ENABLE_DUAL_AXIS)
     #define LIMIT_MASK     ((1<<X_LIMIT_BIT)|(1<<Y_LIMIT_BIT)|(1<<Z_LIMIT_BIT)) // All limit bits
   #endif
@@ -110,21 +109,8 @@
     #define SPINDLE_ENABLE_DDR    DDRB
     #define SPINDLE_ENABLE_PORT   PORTB
     // Z Limit pin and spindle PWM/enable pin swapped to access hardware PWM on Pin 11.
-    #ifdef VARIABLE_SPINDLE
-      #ifdef USE_SPINDLE_DIR_AS_ENABLE_PIN
-        // If enabled, spindle direction pin now used as spindle enable, while PWM remains on D11.
-        #define SPINDLE_ENABLE_BIT    5  // Uno Digital Pin 13 (NOTE: D13 can't be pulled-high input due to LED.)
-      #else
-        #define SPINDLE_ENABLE_BIT    3  // Uno Digital Pin 11
-      #endif
-    #else
-      #define SPINDLE_ENABLE_BIT    4  // Uno Digital Pin 12
-    #endif
-    #ifndef USE_SPINDLE_DIR_AS_ENABLE_PIN
-      #define SPINDLE_DIRECTION_DDR   DDRB
-      #define SPINDLE_DIRECTION_PORT  PORTB
-      #define SPINDLE_DIRECTION_BIT   5  // Uno Digital Pin 13 (NOTE: D13 can't be pulled-high input due to LED.)
-    #endif
+    #define SPINDLE_ENABLE_BIT    5  // Uno Digital Pin 13 (NOTE: D13 can't be pulled-high input due to LED.)
+
 
     // Variable spindle configuration below. Do not change unless you know what you are doing.
     // NOTE: Only used when variable spindle is enabled.

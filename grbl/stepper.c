@@ -399,6 +399,10 @@ ISR(TIMER1_COMPA_vect)
       system_set_exec_state_flag(EXEC_CYCLE_STOP); // Flag main program for cycle end
       return; // Nothing to do but exit.
     }
+    // pen up/down
+    #ifdef PEN_SERVO
+      set_pen_pos();
+    #endif
   }
 
 

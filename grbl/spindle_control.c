@@ -21,6 +21,74 @@
 
 #include "grbl.h"
 
+/*
+Pen Servo: 
+ 
+For a pen bot I want to use the spindle PWM to control a servo.
+In stepper.c it will will look at the Z position. Any Z>0 is pen up.
+ 
+The spindle output is using a PWM, but we need to adjust that 
+ 
+We only need a rough value because we are only up and down
+ 
+Use 1024 prescaler to get. ... 16,000,000 Mhz  / 1024 = 15625 Hz
+It is an 8 bit timer so 15625 / 256 = 61 Hz. This is pretty close the the 50Hz recommended for servos
+Each tick = 0.000064sec 
+One end of servo is 0.001 sec (0.001 / 0.000064 = 15.6 ticks)
+The other end is 0.002 sec (0.002 / 0.000064 = 31 ticks)
+ 
+ 
+*/
+// #define PEN_SERVO    // ...define here or in cpu_map.h to activate
+
+// these are full travel values. If you want to move less than full travel adjust these values
+// If your servo is going the wrong way, swap them.
+  #define PEN_SERVO_DOWN     8      
+  #define PEN_SERVO_UP       16        
+ 
+  #define SERVO_PWM_DDR	  DDRB
+  #define SPINDLE_PWM_PORT  PORTB
+  #define SERVO_PWM_BIT	  3    // Uno Digital Pin 11 
+  #define SERVO_TCCRA_REGISTER	  TCCR2A
+  #define SERVO_TCCRB_REGISTER	  TCCR2B
+  #define SERVO_OCR_REGISTER      OCR2A
+  #define SERVO_COMB_BIT	        COM2A1
+ 
+void init_servo()
+{
+	SERVO_PWM_DDR |= (1<<SERVO_PWM_BIT); // Configure as output pin.
+	SERVO_TCCRA_REGISTER = (1<<COM2A1) | ((1<<WGM20) | (1<<WGM21));
+  SERVO_TCCRB_REGISTER = (1<<CS22) | (1 <<CS21) | (1<<CS20);
+	
+	set_pen_pos();	
+}	
+
+void pen_up()
+{
+	SERVO_OCR_REGISTER = PEN_SERVO_UP;
+}
+
+void pen_down()
+{
+	SERVO_OCR_REGISTER = PEN_SERVO_DOWN;
+}
+
+void set_pen_pos()
+{
+	float wpos_z;
+	
+	wpos_z = system_convert_axis_steps_to_mpos(sys_position, Z_AXIS) - gc_state.coord_system[Z_AXIS];  // get the machine Z in mm	
+		
+	if (wpos_z >= 0.1) { // within one step   
+		pen_up();
+	}
+	else {
+		pen_down();
+	}	
+}
+
+/* Servo part end */
+
 
 #ifdef VARIABLE_SPINDLE
   static float pwm_gradient; // Precalulated value to speed up rpm to PWM conversions.
@@ -43,14 +111,15 @@ void spindle_init()
       #endif
     #endif
     pwm_gradient = SPINDLE_PWM_RANGE/(settings.rpm_max-settings.rpm_min);
+    spindle_stop();
   #else
+    // Configure no variable spindle and only enable pin.
     SPINDLE_ENABLE_DDR |= (1<<SPINDLE_ENABLE_BIT); // Configure as output pin.
-    #ifndef ENABLE_DUAL_AXIS
-      SPINDLE_DIRECTION_DDR |= (1<<SPINDLE_DIRECTION_BIT); // Configure as output pin.
-    #endif
+    spindle_stop();
+		#ifdef PEN_SERVO
+			init_servo(); // put it here so we don't have to edit other files.
+		#endif
   #endif
-
-  spindle_stop();
 }
 
 
@@ -79,14 +148,9 @@ uint8_t spindle_get_state()
       if (bit_isfalse(SPINDLE_ENABLE_PORT,(1<<SPINDLE_ENABLE_BIT))) { 
     #else
       if (bit_istrue(SPINDLE_ENABLE_PORT,(1<<SPINDLE_ENABLE_BIT))) {
-    #endif
-      #ifdef ENABLE_DUAL_AXIS    
+    #endif    
         return(SPINDLE_STATE_CW);
-      #else
-        if (SPINDLE_DIRECTION_PORT & (1<<SPINDLE_DIRECTION_BIT)) { return(SPINDLE_STATE_CCW); }
-        else { return(SPINDLE_STATE_CW); }
-      #endif
-    }
+      }    
   #endif
   return(SPINDLE_STATE_DISABLE);
 }
@@ -237,16 +301,7 @@ void spindle_stop()
     #endif
     spindle_stop();
   
-  } else {
-    
-    #if !defined(USE_SPINDLE_DIR_AS_ENABLE_PIN) && !defined(ENABLE_DUAL_AXIS)
-      if (state == SPINDLE_ENABLE_CW) {
-        SPINDLE_DIRECTION_PORT &= ~(1<<SPINDLE_DIRECTION_BIT);
-      } else {
-        SPINDLE_DIRECTION_PORT |= (1<<SPINDLE_DIRECTION_BIT);
-      }
-    #endif
-  
+  } else {  
     #ifdef VARIABLE_SPINDLE
       // NOTE: Assumes all calls to this function is when Grbl is not moving or must remain off.
       if (settings.flags & BITFLAG_LASER_MODE) { 
